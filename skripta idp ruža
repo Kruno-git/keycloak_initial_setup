@@ -1,0 +1,79 @@
+setenforce Permissive
+systemctl stop firewalld
+
+yum install epel-release -y
+hostnamectl set-hostname <idp_domena_ovdje>
+yum install ipa-client ntp mc wget git gzip zip unzip sssd-dbus jna httpd mod_ssl iptables-service java-1.8.0-openjdk -y
+wget # odgovarajuća verzija keycloaka sa stranice
+useradd keycloak
+cd /opt/keycloak/<version_number>/
+mkdir current  
+ln -s /opt/keycloak/<version_number> /opt/keycloak/current
+tar -xzf keycloak-<version_number>.tar.gz -C /opt/keycloak/current/ --strip-components=1
+chown keycloak: -R /opt/keycloak
+sudo -u keycloak chmod 700 standalone
+
+sudo -u keycloak ./bin/jboss-cli.sh 'embed-server,/subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=proxy-address-forwarding,value=true)'
+sudo -u keycloak ./bin/jboss-cli.sh 'embed-server,/socket-binding-group=standard-sockets/socket-bindi	ng=proxy-https:add(port=443)'
+sudo -u keycloak ./bin/jboss-cli.sh 'embed-server,/subsystem=undertow/server=default-server/http-listener=default:write-attribute(name=redirect-socket,value=proxy-https)'
+systemctl stop ntpd
+vim /etc/ntp.conf # postavke za sinkronizaciju sa idm serverom
+ntpdate <ip_ds1_server> # Dva puta zbog točnije sinkronizacije sa ntp serverom
+timedatectl set-ntp 1
+systemctl start ntpd
+ipa-client-install --mkhomedir 
+kinit admin
+#dodajemo u idm host and principal : HTTP
+ipa-getkeytab -s  -p http/<hostname_idp_servera> -k -k /opt/keycloak-<version_number>.Final/standalone/configuration/keycloak.keytab
+ipa-getcert request -r -f /etc/pki/tls/certs/http.crt -k /etc/pki/tls/private/http.key -N cn=<hostname_idp_servera> -D <hostname_idp_servera> -K http/<hostname_idp_servera>
+openssl x509 -in http.crt -out http.pem
+chmod 755 http.pem
+wget https://github.com/keycloak/libunix-dbus-java/releases/download/libunix-dbus-java-0.8.0/libunix-dbus-java-0.8.0-1.fc24.x86_64.rpm
+yum install libunix-dbus-java-0.8.0-1.fc24.x86_64.rpm -y
+cat <<EOF >   /etc/systemd/system/keycloak.service 
+         [Unit]
+         Description=Jboss Application Server
+         After=network.target
+         [Service]
+         Type=idle
+         User=keycloak
+         Group=keycloak
+         ExecStart=/opt/keycloak-4.7.0.Final/bin/standalone.sh -b 0.0.0.0
+         TimeoutStartSec=600
+         TimeoutStopSec=600
+         [Install]
+         WantedBy=multi-user.target
+         EOF
+systemctl stop httpd
+cat > /etc/httpd/conf.d/keycloak.conf <<EOF
+    Listen 443 https
+    SSLPassPhraseDialog exec:/usr/libexec/httpd-ssl-pass-dialog
+    SSLSessionCache         shmcb:/run/httpd/sslcache(512000)
+    SSLSessionCacheTimeout  300
+    SSLRandomSeed startup file:/dev/urandom  256
+    SSLRandomSeed connect builtin
+    SSLCryptoDevice builtin
+    <VirtualHost *:443>
+      ServerName idp1.hrfd.ms.hrv.nato.int
+      ErrorLog  "/var/log/httpd/<hostname_idp_servera_error_ssl.log"
+      CustomLog "/var/log/httpd/<hostname_idp_servera>_access_ssl.log" combined
+      SSLEngine On
+      SSLCipherSuite HIGH:!MEDIUM:!aNULL:!kRSA:!MD5:!RC4
+      SSLProtocol all -SSLv2 -SSLv3
+      SSLCertificateKeyFile /etc/pki/tls/private/http.key
+      SSLCertificateFile /etc/pki/tls/certs/http.pem
+      SSLCertificateChainFile /etc/ipa/ca.crt
+    SSLHonorCipherOrder on 
+      ProxyRequests Off
+      ProxyPreserveHost On
+      ProxyPass / http://localhost:8080/
+      ProxyPassReverse / http://localhost:8080/
+      RequestHeader set X-Forwarded-Proto "https"
+      RequestHeader set X-Forwarded-Port "443"
+    </VirtualHost>
+    EOF
+mv ssl.conf ssl.old
+mv userdir.conf userdir.old
+mv welcome.conf welcome.old
+systemctl start httpd
+systemctl start keycloak
