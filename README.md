@@ -1,4 +1,5 @@
-Idp server u obliku keycloak
+Idp server u obliku Keycloaka
+
 Nakon što ste konfigururali keycloak, loginajte se na njega preko Web sučelja. Što znači da ćete nastavak konfiguracije odrađivati preko njega. Good luck with that... Nije teško ali recimo da bi bilo zgodno da znate o čemu se radi pa da, sami googlate što bi trebalo napraviti. Preporučam da koristite kerberos kao metodu.
 
 slijedi copy paste sa ostalih repoa.
