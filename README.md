@@ -1,5 +1,7 @@
 Idp server u obliku keycloak
-slijedi copy paste sa ostalih repoa...
+Nakon što ste konfigururali keycloak, loginajte se na njega preko Web sučelja. Što znači da ćete nastavak konfiguracije odrađivati preko njega. Good luck with that... Nije teško ali recimo da bi bilo zgodno da znate o čemu se radi pa da, sami googlate što bi trebalo napraviti. Preporučam da koristite kerberos kao metodu.
+
+slijedi copy paste sa ostalih repoa.
 
 Što se tice konfiguracijskih fajlova ovdje, korisite ih tako sto cete promijeniti podatke relevantne za uspostavljanje vaseg informacijskog sustava. U svrhu ocuvanja mentalnog zdravlja, originalni config ostavite sa ekstenzijom .bak .old ili kako hocete, za svaki slucaj, ako se nesto obatali.
 
